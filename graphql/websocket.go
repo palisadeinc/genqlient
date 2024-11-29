@@ -48,10 +48,16 @@ type webSocketClient struct {
 	Header        http.Header
 	endpoint      string
 	conn          WSConn
+	connParams    map[string]interface{}
 	errChan       chan error
 	subscriptions subscriptionMap
 	isClosing     bool
 	sync.Mutex
+}
+
+type webSocketInitMessage struct {
+	Payload map[string]interface{} `json:"payload"`
+	Type    string                 `json:"type"`
 }
 
 type webSocketSendMessage struct {
@@ -67,8 +73,9 @@ type webSocketReceiveMessage struct {
 }
 
 func (w *webSocketClient) sendInit() error {
-	connInitMsg := webSocketSendMessage{
-		Type: webSocketTypeConnInit,
+	connInitMsg := webSocketInitMessage{
+		Type:    webSocketTypeConnInit,
+		Payload: w.connParams,
 	}
 	return w.sendStructAsJSON(connInitMsg)
 }
@@ -199,7 +206,9 @@ func (w *webSocketClient) Close() error {
 	return w.conn.Close()
 }
 
-func (w *webSocketClient) Subscribe(req *Request, interfaceChan interface{}, forwardDataFunc ForwardDataFunction) (string, error) {
+func (w *webSocketClient) Subscribe(
+	req *Request, interfaceChan interface{}, forwardDataFunc ForwardDataFunction,
+) (string, error) {
 	if req.Query != "" {
 		if strings.HasPrefix(strings.TrimSpace(req.Query), "query") {
 			return "", fmt.Errorf("client does not support queries")

@@ -132,6 +132,18 @@ func NewClientUsingGet(endpoint string, httpClient Doer) Client {
 // The client does not support queries nor mutations, and will return an error
 // if passed a request that attempts one.
 func NewClientUsingWebSocket(endpoint string, wsDialer Dialer, headers http.Header) WebSocketClient {
+	return NewClientUsingWebSocketWithConnectionParams(endpoint, wsDialer, headers, nil)
+}
+
+// NewClientUsingWebSocketWithConnectionParams returns a [WebSocketClient] which makes subscription requests
+// to the given endpoint using webSocket. It allows to pass additional connection parameters
+// to the server during the initial connection handshake.
+//
+// connectionParams is a map of connection parameters to be sent to the server
+// during the initial connection handshake.
+func NewClientUsingWebSocketWithConnectionParams(
+	endpoint string, wsDialer Dialer, headers http.Header, connParams map[string]interface{},
+) WebSocketClient {
 	if headers == nil {
 		headers = http.Header{}
 	}
@@ -141,6 +153,7 @@ func NewClientUsingWebSocket(endpoint string, wsDialer Dialer, headers http.Head
 	return &webSocketClient{
 		Dialer:        wsDialer,
 		Header:        headers,
+		connParams:    connParams,
 		errChan:       make(chan error),
 		endpoint:      endpoint,
 		subscriptions: subscriptionMap{map_: make(map[string]subscription)},
@@ -270,7 +283,8 @@ func (c *client) createPostRequest(req *Request) (*http.Request, error) {
 	httpReq, err := http.NewRequest(
 		c.method,
 		c.endpoint,
-		bytes.NewReader(body))
+		bytes.NewReader(body),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +333,8 @@ func (c *client) createGetRequest(req *Request) (*http.Request, error) {
 	httpReq, err := http.NewRequest(
 		c.method,
 		parsedURL.String(),
-		http.NoBody)
+		http.NoBody,
+	)
 	if err != nil {
 		return nil, err
 	}
