@@ -22,6 +22,8 @@ const (
 	webSocketTypeNext       = "next"
 	webSocketTypeError      = "error"
 	webSocketTypeComplete   = "complete"
+	webSocketTypePing       = "ping"
+	webSocketTypePong       = "pong"
 	websocketConnAckTimeOut = time.Second * 30
 )
 
@@ -58,6 +60,10 @@ type webSocketClient struct {
 type webSocketInitMessage struct {
 	Payload map[string]interface{} `json:"payload"`
 	Type    string                 `json:"type"`
+}
+
+type webSocketPongMessage struct {
+	Type string `json:"type"`
 }
 
 type webSocketSendMessage struct {
@@ -136,13 +142,23 @@ func (w *webSocketClient) forwardWebSocketData(message []byte) error {
 	if err != nil {
 		return err
 	}
+
+	if wsMsg.Type == webSocketTypePing {
+		pongMsg := webSocketPongMessage{
+			Type: webSocketTypePong,
+		}
+		return w.sendStructAsJSON(pongMsg)
+	}
+
 	sub, ok := w.subscriptions.Read(wsMsg.ID)
 	if !ok {
 		return fmt.Errorf("received message for unknown subscription ID '%s'", wsMsg.ID)
 	}
+
 	if sub.hasBeenUnsubscribed {
 		return nil
 	}
+
 	if wsMsg.Type == webSocketTypeComplete {
 		reflect.ValueOf(sub.interfaceChan).Close()
 		return nil
