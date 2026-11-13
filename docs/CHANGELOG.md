@@ -34,6 +34,9 @@ When releasing a new version:
 
 ### Bug fixes:
 
+- WebSocket shutdown always closes the socket and error channel, including
+  failed shutdown writes, and terminal error reporting no longer blocks when
+  the caller stops receiving. Closing an already-closed client is a no-op.
 - omitempty validation:
   - allow `omitempty` on non-nullable input field, if the field has a default
   - allow `omitempty: false` on an input field, even when it is non-nullable
@@ -52,6 +55,7 @@ In addition to several new features and bugfixes, along with this release comes 
 - More accurately guess the package name for generated code (and warn if the config option -- now almost never needed -- looks wrong).
 
 ### Bug fixes:
+
 - Negative pointer directives, i.e., `# @genqlient(pointer: false)` are now respected even in the when `optional: pointer` is set in the configuration file.
 - Made name collisions between query/mutation arguments and local function variables less likely.
 - Fix generation issue related to golang type implementation of complex graphql union fragments.
