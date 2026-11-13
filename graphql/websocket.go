@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -120,7 +121,10 @@ func (w *webSocketClient) handleErr(err error) {
 
 func (w *webSocketClient) listenWebSocket() {
 	for {
-		if w.isClosing {
+		w.Lock()
+		isClosing := w.isClosing
+		w.Unlock()
+		if isClosing {
 			return
 		}
 		_, message, err := w.conn.ReadMessage()
@@ -203,11 +207,18 @@ func (w *webSocketClient) Start(ctx context.Context) (errChan chan error, err er
 	return w.errChan, err
 }
 
-func (w *webSocketClient) Close() error {
-	if w.conn == nil {
+func (w *webSocketClient) Close() (err error) {
+	w.Lock()
+	defer w.Unlock()
+	if w.conn == nil || w.isClosing {
 		return nil
 	}
-	err := w.conn.WriteMessage(closeMessage, formatCloseMessage(closeNormalClosure, ""))
+	w.isClosing = true
+	// Protocol shutdown is best-effort. A failed close/unsubscribe write must
+	// not leave the socket open or the listener trying to report an error.
+	defer close(w.errChan)
+	defer func() { err = errors.Join(err, w.conn.Close()) }()
+	err = w.conn.WriteMessage(closeMessage, formatCloseMessage(closeNormalClosure, ""))
 	if err != nil {
 		return fmt.Errorf("failed to send closure message: %w", err)
 	}
@@ -215,11 +226,7 @@ func (w *webSocketClient) Close() error {
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe: %w", err)
 	}
-	w.Lock()
-	defer w.Unlock()
-	w.isClosing = true
-	close(w.errChan)
-	return w.conn.Close()
+	return nil
 }
 
 func (w *webSocketClient) Subscribe(

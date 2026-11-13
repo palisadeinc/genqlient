@@ -151,10 +151,12 @@ func NewClientUsingWebSocketWithConnectionParams(
 		headers.Add("Sec-WebSocket-Protocol", "graphql-transport-ws")
 	}
 	return &webSocketClient{
-		Dialer:        wsDialer,
-		Header:        headers,
-		connParams:    connParams,
-		errChan:       make(chan error),
+		Dialer:     wsDialer,
+		Header:     headers,
+		connParams: connParams,
+		// The listener reports at most one terminal error. Keep that error
+		// available without requiring a receiver during shutdown.
+		errChan:       make(chan error, 1),
 		endpoint:      endpoint,
 		subscriptions: subscriptionMap{map_: make(map[string]subscription)},
 	}
